@@ -1,0 +1,188 @@
+---
+title: "Predicting healthy activities through sport devices data"
+author: "Pablo Espeso"
+date: "05/31/2020"
+output: html_document
+---
+# Summary
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from [the website here](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+* [Training dataset download](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+* [Test dataset download](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+_The data for this project comes from [Groupware@LES](http://groupware.les.inf.puc-rio.br/har) ([link to archive.org](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har))_
+
+**The goal of your project is to predict the manner in which they did the exercise**.
+
+# Code
+
+This section describes the code and the prediction algorithms used.
+
+## Data libraries and seed
+
+Load required libraries to execute the algorithm:
+
+```{r load_libraries, message=FALSE}
+library(caret)
+library(randomForest)
+library(dplyr)
+library(lattice)
+library(ggplot2)
+library(e1071)
+
+# Set seed for reproducible research
+set.seed(1221)
+```
+
+## Parallel execution
+
+We have introduced a library to use parallel processing with the caret library: `doParallel`. With a few lines, you can improve the performance with the modern multicore processors.
+
+Here are some extra resources:
+
+- [Caret Package Documentation - 9. Parallel Processing](https://topepo.github.io/caret/parallel-processing.html)
+- [Improving Performance of Random Forest in caret::train()](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md
+)
+- [Issue parallel::makeCluster() freezes RStudio on macOS with R 4.x #6692](https://github.com/rstudio/rstudio/issues/6692)
+
+My machine is a iMac 2019 with Intel Core i5-9600K processor (6 cores), 16 GB DDR4 RAM and macOS 'Catalina' 10.15.4 . The firsts executions of the algoritms lasted for > 1 hour; with this parallel improvings the overall script is executed in ~30 minutes.
+
+R version is 4.0.0 (2020-04-24) 'Arbor Day'.
+
+```{r setup_parallel, message=FALSE}
+library(doParallel)
+no_workers <- detectCores() - 1 # Use all cores except 1, which is for the OS
+cl <- parallel::makeCluster(no_workers, setup_strategy = "sequential")
+registerDoParallel(no_workers)
+```
+
+Once we have selected workers and cores to execute, we can check how many are selected with the `getDoParWorkers()` function:
+
+```{r check_parallel}
+getDoParWorkers() # Just checking, how many workers you have
+```
+
+## Data source download
+
+The script first checks if the data exists in local. If not, both training and testing datasets will be downloaded to the `data/` folder.
+
+```{r download_data}
+
+## requires a folder called 'data/' into the workspace.
+
+if (!file.exists("data/pml-training.csv")) {
+  message("Downloading pml-training.csv")
+  url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  download.file(url, "data/pml-training.csv",method='curl')
+} else {
+  message("pml-training.csv already downloaded")
+}
+if (!file.exists("data/pml-testing.csv")) {
+  url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  download.file(url, "data/pml-testing.csv",method='curl')
+  message("Downloading pml-testing.csv")
+} else {
+  message("pml-testing.csv already downloaded")
+}
+```
+
+## Load and clean data:
+
+Before we execute train a model, we need to 'clean' the data with these three steps:
+
+* Remove unvaluable columns. These colnames that contains ids and timestamps:
+  - X
+  - user_name
+  - raw_timestamp_part_1
+  - raw_timestamp_part_2
+  - cvtd_timestamp
+* Remove columns with >= 95% NAs
+* Remove columns with values close to Zero
+
+```{r load_data}
+inputTrainingData <- read.csv("data/pml-training.csv")
+dim(inputTrainingData) # Original dimensions
+
+# Remove 1:5 columns, since they contain unvaluable information for the assignment
+# I.e.: identificators, names, etc.
+inputTrainingData <- inputTrainingData[, -(1:5)]
+dim(inputTrainingData)
+
+# Remove columns with >= 95% NAs
+columnsToMaintain <- colSums(is.na(inputTrainingData))/nrow(inputTrainingData) < 0.95
+cleanInputTrainingData <- inputTrainingData[,columnsToMaintain]
+dim(cleanInputTrainingData)
+
+# Remove columns with values ~0.0
+cleanInputTrainingData <- cleanInputTrainingData[, -nearZeroVar(cleanInputTrainingData)]
+dim(cleanInputTrainingData)
+```
+
+## Create training and testing objects (70/30)
+
+Once the data has been cleaned, we can create training and testing datasets with a 70/30 proportion. We assign them the `training` and `testing` object names.
+
+```{r training_testing_datasets} 
+
+# Create training & testing datasets and check their dimensions
+inTrain <- createDataPartition(cleanInputTrainingData$classe, p=0.7, list=FALSE)
+training <- cleanInputTrainingData[inTrain,]
+testing <- cleanInputTrainingData[-inTrain,]
+
+dim(training); dim(testing)
+```
+
+We also factor the `classe` column:
+
+```{r factor_classe}
+training$classe <- factor(training$classe)
+testing$classe <- factor(testing$classe)
+```
+
+## Train random forest model
+
+Now we can train a random forest model with the `train()` function and the `method = "rf"` argument. We save its accuracy in the `accuracy.rf` variable.
+
+```{r train_rf, cache=TRUE}
+rf.model <- train(classe ~ ., training, method = 'rf')
+Sys.sleep(1) # Needed if you do parallalel processing with > 1 cores. System will wait for 1 second to finish the execution of all cores.
+rf.prediction <- predict(rf.model, testing)
+rf.confusion.matrix <- confusionMatrix(rf.prediction, testing$classe)
+accuracy.rf <- rf.confusion.matrix$overall['Accuracy']
+rf.confusion.matrix
+```
+
+## Train decision tree model
+
+Similarly, we train a decision tree model by using the `method = 'rpart'` argument. We save its accuracy in the `accuracy.dt` variable.
+
+```{r train_rpart}
+dt.model <- train(classe ~., training, method='rpart')
+dt.prediction <- predict(dt.model, testing)
+dt.confusion.matrix <- confusionMatrix(dt.prediction, testing$classe)
+accuracy.dt <- dt.confusion.matrix$overall['Accuracy']
+dt.confusion.matrix
+```
+
+## Remove parallel processing
+
+Once the 'big' work has been done, we remove the parallalel processing and get back to 1 core execution:
+
+```{r stop_parallel}
+stopCluster(cl)
+registerDoSEQ() # return to 1 core R execution
+```
+
+# Results and conclusions
+
+We have trained a Random Forest (`method = "rf"`) and a Decision Tree (`method = 'rpart'`) models using Caret package (more detailes at [its documentation](https://topepo.github.io/caret/train-models-by-tag.html)).
+
+The accuracy of both models is:
+
+```{r results}
+paste("Random Forest model accuracy: ", accuracy.rf, sep = "")
+paste("Decision Tree model accuracy: ", accuracy.dt, sep = "")
+```
+
+So far, **the Random Forest model shows a much better accuracy than the Decision Tree model** for this data.
