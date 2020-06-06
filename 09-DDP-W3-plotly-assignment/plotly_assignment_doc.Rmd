@@ -1,0 +1,81 @@
+---
+title: "Human height, weight and age"
+author: "Pablo Espeso"
+date: "6/6/2020"
+output: html_document
+---
+
+## Submission
+
+This submission contains two files:
+
+* [html file](plotly_assignment_doc.html) (this file!), with an explanation of the assignment and the created project.
+* [Rmd source file](plotly_assignment_doc.Rmd), with the code of the html file.
+
+## Assignment requeriments
+
+_From Coursera_
+
+Create a web page presentation using R Markdown that features a plot created with Plotly. Host your webpage on either GitHub Pages, RPubs, or NeoCities. Your webpage must contain the date that you created the document, and it must contain a plot created with Plotly. We would love to see you show off your creativity!
+
+Criteria:
+
+1. Does the web page feature a date and is this date less than two months before the date that you're grading this assignment?
+2. Is the web page a presentation and does it feature an interactive plot that appears to have been created with Plotly?
+
+## Data explanation
+
+We took a dataset with height (meters), weight (kilograms), age (years) and gender (1 == male; 0 == female) and plot all of them in a scatter3d plotly.
+
+Data is taken from [Howell1.csv](https://github.com/rmcelreath/rethinking/blob/master/data/Howell1.csv) and can be downloaded [from here](https://github.com/rmcelreath/rethinking/raw/master/data/Howell1.csv). It contains 545 rows with all data. An aalternative dataset is [Howell2](https://github.com/rmcelreath/rethinking/blob/master/data/Howell2.csv), slightly different.
+
+For this simple assignment, we take the data directly from the csv and show the scatter3d with these variables:
+
+* X: height
+* Y: weight
+* Z: age
+
+And color them with the gender. Since it is a binary variable (1 == male; 0 == female), the plot only shows two colours.
+
+## Code explanation
+
+### Load libraries
+
+First, we load the plotly library.
+
+```{r libraries, message = FALSE}
+library(plotly)
+```
+
+### Load data
+
+We set a url to download the data and load it into a `data` variable.
+
+
+```{r load_data}
+url <- "https://raw.githubusercontent.com/rmcelreath/rethinking/master/data/Howell1.csv"
+data <- read.csv(url, sep = ";")
+str(data)
+```
+
+### Create and show plotly
+
+Once the data has been loaded, we create a plotly plot and show it.
+
+```{r plot_ly, warning = FALSE}
+my.plot <- plot_ly(data,
+                   type = "scatter3d",
+                   mode = "markers",
+                   x = ~height,
+                   y = ~weight,
+                   z = ~age,
+                   color = ~male)
+my.plot <- my.plot %>% layout(scene = list(
+              xaxis = list(title = "Height (meters)"),
+              yaxis = list(title = "Weight (kilograms)"),
+              zaxis = list(title = "Age (years)")
+              )
+)
+my.plot
+
+```
