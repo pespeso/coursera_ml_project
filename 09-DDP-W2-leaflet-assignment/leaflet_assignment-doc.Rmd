@@ -1,0 +1,74 @@
+---
+title: "Leaflet map assignment"
+author: "Pablo Espeso"
+date: "6/6/2020"
+output: html_document
+---
+
+## Assignment instructions
+
+_From Coursera_
+
+Create a web page using R Markdown that features a map created with Leaflet. Host your webpage on either GitHub Pages, RPubs, or NeoCities.
+
+Your webpage must contain the date that you created the document, and it must contain a map created with Leaflet. We would love to see you show off your creativity!
+
+## Project
+
+We will load some simple data from michelin stars restaurants location, and put them into a leaflet map.
+
+The data is stored in Kaggle and belongs to its autors. It [can be downloaded there](https://www.kaggle.com/jackywang529/michelin-restaurants?select=one-star-michelin-restaurants.csv). We have decided to show only 1-star restaurants due to its number (544). Since the dataset contains latitude and longitude columns, its easy to show them on leaflet.
+
+## Code
+
+First, we load the required libraries:
+
+```{r load_libraries}
+library(leaflet)
+library(htmltools)
+```
+
+Download and load data into memory.
+
+```{r load_data}
+url <- "https://storage.googleapis.com/kagglesdsdata/datasets%2F279628%2F577823%2Fone-star-michelin-restaurants.csv?GoogleAccessId=gcp-kaggle-com@kaggle-161607.iam.gserviceaccount.com&Expires=1591617732&Signature=KJX4coBbXafDt8gJO58rWfYgG5IoAEmxnOyJPN7TEIRjMdJLyyRs19C01W6HxBKZN3avDRVwGpi%2Fbx1Oi6io4EgQteacQ2z77ZYheVQM%2F7dZdvYI6W8it1fvt%2FpZXDv1yvsDP68aRr9gVo%2B2TvALijP8vpefOTd1p1VRfiyC6VdDCATch6Hj9trAbHl3VNPkau%2B1V0HOsK9ZOmo5vNqsfcKllu0yBbb4TaIT%2BhDuoK6ShhVCLFrEut%2Bu8O84iQhzA7qMBzhq4OFWugS2k9v7QsncrKmyLwqTR2fiNlRRsYFVsKeGQAe7QBRdyWxzB%2FF5Ql4fTjudS9q1OO9so7dZsQ%3D%3D"
+download.file(url, destfile = "1s_michelin_restaurants.csv", method = "curl")
+data <- read.csv(file = "1s_michelin_restaurants.csv", header = TRUE, sep = ",")
+```
+
+Extract used columns. This step is not required, but it will be easy to understand the process.
+
+```{r subset}
+sub.data <- data.frame(name = data$name,
+                       lat = data$latitude,
+                       long = data$longitude,
+                       city = data$city,
+                       region = data$region,
+                       cuisine = data$cuisine,
+                       price = data$price)
+```
+
+Create a map with leaflet.
+
+```{r create_map}
+map.1star <- sub.data %>%
+  leaflet(width = "100%") %>%
+  addTiles() %>%
+  addMarkers(lat = sub.data$lat,
+             lng = sub.data$long,
+             popup=paste("<br>Name: ", htmlEscape(sub.data$name), 
+                         "<br>Region: ", htmlEscape(sub.data$region),
+                         "<br>City: ", htmlEscape(sub.data$city),
+                         "<br>Cuisine: ", htmlEscape(sub.data$cuisine),
+                         "<br>Price: ", htmlEscape(sub.data$price)
+             )
+  )
+```
+
+Show the map.
+
+```{r}
+map.1star
+```
+
+
