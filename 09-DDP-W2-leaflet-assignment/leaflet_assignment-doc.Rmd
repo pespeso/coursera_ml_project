@@ -13,6 +13,13 @@ Create a web page using R Markdown that features a map created with Leaflet. Hos
 
 Your webpage must contain the date that you created the document, and it must contain a map created with Leaflet. We would love to see you show off your creativity!
 
+## Submission
+
+This submission contains the following elements:
+
+* [compiled html file](leaflet_assignment-doc.html) (this file), an html file with the explanation of the project.
+* [Rmd file](leaflet_assignment-doc.Rmd), the source for the html file.
+
 ## Project
 
 We will load some simple data from michelin stars restaurants location, and put them into a leaflet map.
